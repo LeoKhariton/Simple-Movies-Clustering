@@ -2,9 +2,11 @@ import sqlite3
 import dash
 from dash import dcc
 from dash import html
-import plotly.graph_objs as go
 import pandas as pd
 from sklearn.cluster import KMeans
+from sklearn.preprocessing import MultiLabelBinarizer, MinMaxScaler
+from dash.dependencies import Input, Output
+import plotly.express as px
 
 conn = sqlite3.connect('movies.db')
 query = '''
@@ -18,55 +20,45 @@ LEFT JOIN movie_directors ON movies.id = movie_directors.movie_id
 LEFT JOIN directors ON movie_directors.director_id = directors.id
 GROUP BY movies.id
 '''
-df = pd.read_sql_query(query, conn)
+data = pd.read_sql_query(query, conn)
 conn.close()
 
-# Convert genres and directors into numerical data using one-hot encoding
-df_encoded = pd.get_dummies(df, columns=['genres', 'directors'])
+# Step 2: Preprocess the data
+# Encode genres and directors using MultiLabelBinarizer
+mlb_genres = MultiLabelBinarizer()
+genres_encoded = mlb_genres.fit_transform(data['genres'].str.split(','))
+genres_df = pd.DataFrame(genres_encoded, columns=mlb_genres.classes_)
 
-# Select the features for clustering
-features = ['year', 'rating'] + list(df_encoded.columns[df_encoded.columns.str.startswith('genres_')]) + list(df_encoded.columns[df_encoded.columns.str.startswith('directors_')])
-X = df_encoded[features]
+mlb_directors = MultiLabelBinarizer()
+directors_encoded = mlb_directors.fit_transform(data['directors'].str.split(','))
+directors_df = pd.DataFrame(directors_encoded, columns=mlb_directors.classes_)
 
-# Perform clustering using K-means
-num_clusters = 5  # You can determine the optimal number of clusters using techniques such as the elbow method or silhouette analysis
-kmeans = KMeans(n_clusters=num_clusters, random_state=42)
-clusters = kmeans.fit_predict(X)
+# Scale year and rating using MinMaxScaler
+scaler = MinMaxScaler()
+year_rating_scaled = scaler.fit_transform(data[['year', 'rating']])
+year_rating_df = pd.DataFrame(year_rating_scaled, columns=['year_scaled', 'rating_scaled'])
 
-# Add the cluster labels to the DataFrame
-df['cluster'] = clusters
+# Combine the encoded and scaled features
+processed_data = pd.concat([data[['title']], genres_df, directors_df, year_rating_df], axis=1)
 
-# Prepare the bar chart data
-cluster_counts = df['cluster'].value_counts().sort_index()
-data = [go.Bar(
-    x=cluster_counts.index,
-    y=cluster_counts.values,
-    text=cluster_counts.values,
-    textposition='auto',
-    name='Number of Movies'
-)]
+# Step 3: Perform K-means clustering
+kmeans = KMeans(n_clusters=5, random_state=42)
+clusters = kmeans.fit_predict(processed_data.drop('title', axis=1))
 
-# Create the layout
-layout = go.Layout(
-    title='Movie Clusters',
-    xaxis={'title': 'Cluster'},
-    yaxis={'title': 'Number of Movies'}
-)
-
-# Define the Dash app and layout
+# Step 4: Visualize the clusters using Dash
 app = dash.Dash(__name__)
 
 app.layout = html.Div([
-    html.H1('Movie Clusters'),
-    dcc.Graph(
-        id='cluster-graph',
-        figure={
-            'data': data,
-            'layout': layout
-        }
-    )
+    dcc.Graph(id='cluster-graph')
 ])
 
-# Run the Dash app
+@app.callback(
+    Output('cluster-graph', 'figure'),
+    [Input('cluster-graph', 'id')]
+)
+def update_graph(input_value):
+    fig = px.scatter(processed_data, x='year_scaled', y='rating_scaled', color=clusters, hover_data=['title'])
+    return fig
+
 if __name__ == '__main__':
     app.run_server(debug=True)
