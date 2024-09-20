@@ -7,6 +7,9 @@ from sklearn.cluster import KMeans
 from sklearn.preprocessing import MultiLabelBinarizer, MinMaxScaler
 from dash.dependencies import Input, Output
 import plotly.express as px
+import numpy as np
+from sklearn.preprocessing import StandardScaler, MultiLabelBinarizer
+import plotly.graph_objs as go
 
 conn = sqlite3.connect('movies.db')
 query = '''
@@ -24,41 +27,50 @@ data = pd.read_sql_query(query, conn)
 conn.close()
 
 # Step 2: Preprocess the data
-# Encode genres and directors using MultiLabelBinarizer
-mlb_genres = MultiLabelBinarizer()
-genres_encoded = mlb_genres.fit_transform(data['genres'].str.split(','))
-genres_df = pd.DataFrame(genres_encoded, columns=mlb_genres.classes_)
+# Encode categorical variables
+mlb = MultiLabelBinarizer()
+genres_encoded = mlb.fit_transform(data['genres'].str.split(','))
+directors_encoded = mlb.fit_transform(data['directors'].str.split(','))
 
-mlb_directors = MultiLabelBinarizer()
-directors_encoded = mlb_directors.fit_transform(data['directors'].str.split(','))
-directors_df = pd.DataFrame(directors_encoded, columns=mlb_directors.classes_)
-
-# Scale year and rating using MinMaxScaler
-scaler = MinMaxScaler()
+# Scale numerical variables
+scaler = StandardScaler()
 year_rating_scaled = scaler.fit_transform(data[['year', 'rating']])
-year_rating_df = pd.DataFrame(year_rating_scaled, columns=['year_scaled', 'rating_scaled'])
 
-# Combine the encoded and scaled features
-processed_data = pd.concat([data[['title']], genres_df, directors_df, year_rating_df], axis=1)
+# Combine the encoded and scaled variables
+X = np.hstack((genres_encoded, directors_encoded, year_rating_scaled))
 
-# Step 3: Perform K-means clustering
+# Step 3: Apply K-means clustering
 kmeans = KMeans(n_clusters=5, random_state=42)
-clusters = kmeans.fit_predict(processed_data.drop('title', axis=1))
+clusters = kmeans.fit_predict(X)
 
-# Step 4: Visualize the clusters using Dash
+# Step 4: Create a Dash app for visualization
 app = dash.Dash(__name__)
 
+# Create a scatter plot of the clusters
+trace = go.Scatter(
+    x=data['year'],
+    y=data['rating'],
+    mode='markers',
+    marker=dict(color=clusters),
+    text=data['title']
+)
+
+layout = go.Layout(
+    title='Movie Clusters',
+    xaxis=dict(title='Year'),
+    yaxis=dict(title='Rating')
+)
+
+fig = go.Figure(data=[trace], layout=layout)
+
 app.layout = html.Div([
-    dcc.Graph(id='cluster-graph')
+    dcc.Graph(id='cluster-plot', figure=fig)
 ])
 
-@app.callback(
-    Output('cluster-graph', 'figure'),
-    [Input('cluster-graph', 'id')]
-)
-def update_graph(input_value):
-    fig = px.scatter(processed_data, x='year_scaled', y='rating_scaled', color=clusters, hover_data=['title'])
-    return fig
+# Step 5: Add a smooth animation to the visualization
+# You can use the `animate` function from the `plotly.express` module to add animation to the scatter plot
+# Refer to the Plotly documentation for more details on how to use the `animate` function
 
+# Run the Dash app
 if __name__ == '__main__':
     app.run_server(debug=True)
