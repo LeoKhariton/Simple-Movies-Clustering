@@ -3,11 +3,8 @@ import dash
 from dash import dcc, html
 import pandas as pd
 from sklearn.cluster import KMeans
-from sklearn.preprocessing import MultiLabelBinarizer, MinMaxScaler, StandardScaler, MultiLabelBinarizer, OneHotEncoder, LabelEncoder
-from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import MultiLabelBinarizer
 import plotly.express as px
-import plotly.graph_objs as go
 
 conn = sqlite3.connect('movies.db')
 query = '''
@@ -24,56 +21,66 @@ GROUP BY movies.id
 data = pd.read_sql_query(query, conn)
 conn.close()
 
-data['genres'] = data['genres'].str.split(',')
-data['directors'] = data['directors'].str.split(',')
+# Преобразование категориальных данных в числовые
+mlb = MultiLabelBinarizer()
+genres_encoded = pd.DataFrame(mlb.fit_transform(data['genres'].str.split(',')), columns=mlb.classes_, index=data.index)
+directors_encoded = pd.DataFrame(mlb.fit_transform(data['directors'].str.split(',')), columns=mlb.classes_, index=data.index)
 
-mlb_genres = MultiLabelBinarizer()
-mlb_directors = MultiLabelBinarizer()
-genres_binary = mlb_genres.fit_transform(data['genres'])
-directors_binary = mlb_directors.fit_transform(data['directors'])
+# Объединение данных
+data_encoded = pd.concat([data[['year', 'rating']], genres_encoded, directors_encoded], axis=1)
 
-genres_df = pd.DataFrame(genres_binary, columns=mlb_genres.classes_)
-directors_df = pd.DataFrame(directors_binary, columns=mlb_directors.classes_)
+# Кластеризация
+kmeans = KMeans(n_clusters=5).fit(data_encoded)
 
-data = pd.concat([data, genres_df, directors_df], axis=1)
-
-data.drop(['genres', 'directors'], axis=1, inplace=True)
-
-preprocessor = ColumnTransformer(
-    transformers=[
-        ('year_rating', MinMaxScaler(), ['year', 'rating'])
-    ])
-
-preprocessed_data = preprocessor.fit_transform(data)
-
-kmeans = KMeans(n_clusters=5)
-clusters = kmeans.fit_predict(preprocessed_data)
-
-data['cluster'] = clusters
-
+# Добавление результатов кластеризации в исходный DataFrame
+data['cluster'] = kmeans.labels_
 
 
 app = dash.Dash(__name__)
 
-figures = []
-for genre in data['genres'].unique():
-    fig = px.box(data[data['genres'] == genre], x='genres', y='rating', color='cluster')
-    figures.append(fig)
+# Диаграмма 1: по оси Y - рейтинги, по X - жанры
+fig1 = px.scatter(data, x='genres', y='rating', color='cluster', title='Рейтинги по жанрам с кластеризацией')
 
-# Define the layout of the Dash application
+# Диаграмма 2: по оси Y - жанры, по X - режиссеры
+fig2 = px.scatter(data, x='directors', y='genres', color='cluster', title='Жанры по режиссерам с кластеризацией')
+
+# Диаграмма 3: по оси Y - жанры, по X - года
+fig3 = px.scatter(data, x='year', y='genres', color='cluster', title='Жанры по годам с кластеризацией')
+
+# Диаграмма 4: по оси Y - рейтинги, по X - режиссеры
+fig4 = px.scatter(data, x='directors', y='rating', color='cluster', title='Рейтинги по режиссерам с кластеризацией')
+
+# Диаграмма 5: по оси Y - рейтинги, по X - года
+fig5 = px.scatter(data, x='year', y='rating', color='cluster', title='Рейтинги по годам с кластеризацией')
+
+# Диаграмма 6: по оси Y - режиссеры, по X - года
+fig6 = px.scatter(data, x='year', y='directors', color='cluster', title='Режиссеры по годам с кластеризацией')
+
 app.layout = html.Div(children=[
-    html.H1(children='Movie Clustering'),
-
-    html.Div(children='''
-        Box plots of ratings for each genre
-    '''),
-    html.Div(children=[
-        dcc.Graph(
-            id=f'box-plot-{i}',
-            figure=fig
-        )
-        for i, fig in enumerate(figures)
-    ])
+    dcc.Graph(
+        id='graph1',
+        figure=fig1
+    ),
+    dcc.Graph(
+        id='graph2',
+        figure=fig2
+    ),
+    dcc.Graph(
+        id='graph3',
+        figure=fig3
+    ),
+    dcc.Graph(
+        id='graph4',
+        figure=fig4
+    ),
+    dcc.Graph(
+        id='graph5',
+        figure=fig5
+    ),
+    dcc.Graph(
+        id='graph6',
+        figure=fig6
+    )
 ])
 
 if __name__ == '__main__':
