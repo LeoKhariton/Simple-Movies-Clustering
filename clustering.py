@@ -1,6 +1,5 @@
 import sqlite3
-import dash
-from dash import dcc, html
+from dash import Dash, dcc, html
 import pandas as pd
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import MultiLabelBinarizer
@@ -30,58 +29,37 @@ directors_encoded = pd.DataFrame(mlb.fit_transform(data['directors'].str.split('
 data_encoded = pd.concat([data[['year', 'rating']], genres_encoded, directors_encoded], axis=1)
 
 # Кластеризация
-kmeans = KMeans(n_clusters=5).fit(data_encoded)
+kmeans = KMeans(n_clusters=7).fit(data_encoded)
 
 # Добавление результатов кластеризации в исходный DataFrame
-data['cluster'] = kmeans.labels_
+data['cluster'] = kmeans.labels_.astype(str)
 
-
-app = dash.Dash(__name__)
+data_genres = data.assign(genres=data['genres'].str.split(',')).explode('genres').assign(directors=data['directors'].str.split(',')).explode('directors')
 
 # Диаграмма 1: по оси Y - рейтинги, по X - жанры
-fig1 = px.scatter(data, x='genres', y='rating', color='cluster', title='Рейтинги по жанрам с кластеризацией')
-
+fig1 = px.scatter(data_genres, x='genres', y='rating', color='cluster', title='Рейтинги по жанрам с кластеризацией', height=700)
 # Диаграмма 2: по оси Y - жанры, по X - режиссеры
-fig2 = px.scatter(data, x='directors', y='genres', color='cluster', title='Жанры по режиссерам с кластеризацией')
-
+fig2 = px.scatter(data_genres, x='directors', y='genres', color='cluster', title='Жанры по режиссерам с кластеризацией')
 # Диаграмма 3: по оси Y - жанры, по X - года
-fig3 = px.scatter(data, x='year', y='genres', color='cluster', title='Жанры по годам с кластеризацией')
-
+fig3 = px.scatter(data_genres, x='year', y='genres', color='cluster', title='Жанры по годам с кластеризацией', height=700)
 # Диаграмма 4: по оси Y - рейтинги, по X - режиссеры
-fig4 = px.scatter(data, x='directors', y='rating', color='cluster', title='Рейтинги по режиссерам с кластеризацией')
-
+fig4 = px.scatter(data_genres, x='directors', y='rating', color='cluster', title='Рейтинги по режиссерам с кластеризацией')
 # Диаграмма 5: по оси Y - рейтинги, по X - года
 fig5 = px.scatter(data, x='year', y='rating', color='cluster', title='Рейтинги по годам с кластеризацией')
-
 # Диаграмма 6: по оси Y - режиссеры, по X - года
-fig6 = px.scatter(data, x='year', y='directors', color='cluster', title='Режиссеры по годам с кластеризацией')
+fig6 = px.scatter(data_genres, x='year', y='directors', color='cluster', title='Режиссеры по годам с кластеризацией', height=700)
+fig7 = px.scatter(data, x='cluster', y='title', color='cluster', title='Кластеризация фильмов', height=700)
 
-app.layout = html.Div(children=[
-    dcc.Graph(
-        id='graph1',
-        figure=fig1
-    ),
-    dcc.Graph(
-        id='graph2',
-        figure=fig2
-    ),
-    dcc.Graph(
-        id='graph3',
-        figure=fig3
-    ),
-    dcc.Graph(
-        id='graph4',
-        figure=fig4
-    ),
-    dcc.Graph(
-        id='graph5',
-        figure=fig5
-    ),
-    dcc.Graph(
-        id='graph6',
-        figure=fig6
-    )
+app = Dash()
+
+app.layout = html.Div([
+    dcc.Graph(figure=fig1),
+    dcc.Graph(figure=fig2),
+    dcc.Graph(figure=fig3),
+    dcc.Graph(figure=fig4),
+    dcc.Graph(figure=fig5),
+    dcc.Graph(figure=fig6),
+    dcc.Graph(figure=fig7)
 ])
 
-if __name__ == '__main__':
-    app.run_server(debug=True)
+app.run_server(debug=True)
