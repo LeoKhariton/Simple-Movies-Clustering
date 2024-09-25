@@ -1,15 +1,15 @@
 import sqlite3
-from dash import Dash, dcc, html
+from dash import Dash, dcc, html, Input, Output, callback
 import pandas as pd
 from sklearn.cluster import KMeans
-from sklearn.preprocessing import MultiLabelBinarizer
+from sklearn.preprocessing import LabelEncoder
 import plotly.express as px
 
 conn = sqlite3.connect('movies.db')
 query = '''
 SELECT movies.title, movies.year, movies.rating,
-       GROUP_CONCAT(genres.name) AS genres,
-       GROUP_CONCAT(directors.name) AS directors
+       SUBSTR(GROUP_CONCAT(DISTINCT genres.name), 1, INSTR(GROUP_CONCAT(DISTINCT genres.name), ',') - 1) AS genre,
+       SUBSTR(GROUP_CONCAT(DISTINCT directors.name), 1, INSTR(GROUP_CONCAT(DISTINCT directors.name), ',') - 1) AS director
 FROM movies
 LEFT JOIN movie_genres ON movies.id = movie_genres.movie_id
 LEFT JOIN genres ON movie_genres.genre_id = genres.id
@@ -20,51 +20,111 @@ GROUP BY movies.id
 data = pd.read_sql_query(query, conn)
 conn.close()
 
+
 # Преобразование категориальных данных в числовые
-mlb = MultiLabelBinarizer()
-genres_encoded = pd.DataFrame(mlb.fit_transform(data['genres'].str.split(',')), columns=mlb.classes_, index=data.index)
-directors_encoded = pd.DataFrame(mlb.fit_transform(data['directors'].str.split(',')), columns=mlb.classes_, index=data.index)
+le = LabelEncoder()
+genre_encoded = le.fit_transform(data['genre'])
+director_encoded = le.fit_transform(data['director'])
 
 # Объединение данных
-data_encoded = pd.concat([data[['year', 'rating']], genres_encoded, directors_encoded], axis=1)
+data_encoded = pd.DataFrame({
+    'year': data['year'],
+    'rating': data['rating'],
+    'genre': genre_encoded,
+    'director': director_encoded
+})
 
 # Кластеризация
-kmeans = KMeans(n_clusters=7).fit(data_encoded)
+kmeans = KMeans(n_clusters=7).fit_predict(data_encoded)
 
-# Добавление результатов кластеризации в исходный DataFrame
-data['cluster'] = kmeans.labels_.astype(str)
+data['cluster'] = kmeans.astype(str)
 
-#это надо делать и до кластеризации?
-#data = data.assign(genres=data['genres'].str.split(',')).explode('genres').assign(directors=data['directors'].str.split(',')).explode('directors')
-#print(data)
-
-# безрезультатная диаграмма
-fig1 = px.scatter(data, x='genres', y='rating', color='cluster', title='Рейтинги по жанрам с кластеризацией', height=700)
-# Диаграмма 2: по оси Y - жанры, по X - режиссеры
-fig2 = px.scatter(data, x='directors', y='genres', color='cluster', title='Жанры по режиссерам с кластеризацией', height=700)
-# Диаграмма 3: по оси Y - жанры, по X - года
-fig3 = px.scatter(data, x='year', y='genres', color='cluster', title='Жанры по годам с кластеризацией', height=1200)
-# Диаграмма 4: по оси Y - рейтинги, по X - режиссеры
-fig4 = px.scatter(data, x='directors', y='rating', color='cluster', title='Рейтинги по режиссерам с кластеризацией', height=700)
-# Диаграмма 5: по оси Y - рейтинги, по X - года
-fig5 = px.scatter(data, x='year', y='rating', color='cluster', title='Рейтинги по годам с кластеризацией', height=700)
-# Диаграмма 6: по оси Y - режиссеры, по X - года
-fig6 = px.scatter(data, x='year', y='directors', color='cluster', title='Режиссеры по годам с кластеризацией', height=700)
-fig7 = px.scatter(data, x='cluster', y='title', color='cluster', title='Кластеризация фильмов', height=1000)
-
-fig8 = px.scatter_3d(data, x='year', y='rating', z='genres', color='cluster', title='Кластеризация фильмов', height=1100)
 
 app = Dash()
 
 app.layout = html.Div([
-    dcc.Graph(figure=fig1),
-    dcc.Graph(figure=fig2),
-    dcc.Graph(figure=fig3),
-    dcc.Graph(figure=fig4),
-    dcc.Graph(figure=fig5),
-    dcc.Graph(figure=fig6),
-    dcc.Graph(figure=fig7),
-    dcc.Graph(figure=fig8)
+    dcc.Dropdown(
+        id='x-axis',
+        options=[
+            {'label': 'Названия', 'value': 'title'},
+            {'label': 'Рейтинги', 'value': 'rating'},
+            {'label': 'Жанры', 'value': 'genre'},
+            {'label': 'Режиссеры', 'value': 'director'},
+            {'label': 'Года', 'value': 'year'},
+            {'label': 'Кластеры', 'value': 'cluster'}
+        ],
+        value='year'
+    ),
+    dcc.Dropdown(
+        id='y-axis',
+        options=[
+            {'label': 'Названия', 'value': 'title'},
+            {'label': 'Рейтинги', 'value': 'rating'},
+            {'label': 'Жанры', 'value': 'genre'},
+            {'label': 'Режиссеры', 'value': 'director'},
+            {'label': 'Года', 'value': 'year'},
+            {'label': 'Кластеры', 'value': 'cluster'}
+        ],
+        value='title'
+    ),
+    dcc.Graph(id='scatter-plot'),
+
+    dcc.Dropdown(
+        id='x-axis-3d',
+        options=[
+            {'label': 'Названия', 'value': 'title'},
+            {'label': 'Рейтинги', 'value': 'rating'},
+            {'label': 'Жанры', 'value': 'genre'},
+            {'label': 'Режиссеры', 'value': 'director'},
+            {'label': 'Года', 'value': 'year'},
+            {'label': 'Кластеры', 'value': 'cluster'}
+        ],
+        value='year'
+    ),
+    dcc.Dropdown(
+        id='y-axis-3d',
+        options=[
+            {'label': 'Названия', 'value': 'title'},
+            {'label': 'Рейтинги', 'value': 'rating'},
+            {'label': 'Жанры', 'value': 'genre'},
+            {'label': 'Режиссеры', 'value': 'director'},
+            {'label': 'Года', 'value': 'year'},
+            {'label': 'Кластеры', 'value': 'cluster'}
+        ],
+        value='genre'
+    ),
+    dcc.Dropdown(
+        id='z-axis-3d',
+        options=[
+            {'label': 'Названия', 'value': 'title'},
+            {'label': 'Рейтинги', 'value': 'rating'},
+            {'label': 'Жанры', 'value': 'genre'},
+            {'label': 'Режиссеры', 'value': 'director'},
+            {'label': 'Года', 'value': 'year'},
+            {'label': 'Кластеры', 'value': 'cluster'}
+        ],
+        value='rating'
+    ),
+    dcc.Graph(id='scatter-plot-3d')
 ])
+
+@callback(
+    Output('scatter-plot', 'figure'),
+    [Input('x-axis', 'value'),
+     Input('y-axis', 'value')]
+)
+def update_graph(x_axis, y_axis):
+    fig = px.scatter(data, x=x_axis, y=y_axis, color='cluster', title=f'Кластеризация фильмов', height=700, hover_data=['title', 'year', 'rating', 'genre', 'director', 'cluster'])
+    return fig
+
+@callback(
+     Output('scatter-plot-3d', 'figure'),
+    [Input('x-axis-3d', 'value'),
+     Input('y-axis-3d', 'value'),
+     Input('z-axis-3d', 'value')]
+)
+def update_graph3d(x_axis3d, y_axis3d, z_axis3d):
+    fig = px.scatter_3d(data, x=x_axis3d, y=y_axis3d, z=z_axis3d, color='cluster', title=f'Кластеризация фильмов', height=1100, hover_data=['title', 'year', 'rating', 'genre', 'director', 'cluster'])
+    return fig
 
 app.run_server(debug=True)
