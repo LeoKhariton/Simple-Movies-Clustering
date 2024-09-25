@@ -35,23 +35,24 @@ kmeans = KMeans(n_clusters=7).fit(data_encoded)
 data['cluster'] = kmeans.labels_.astype(str)
 
 #это надо делать и до кластеризации?
-data_genres = data.assign(genres=data['genres'].str.split(',')).explode('genres').assign(directors=data['directors'].str.split(',')).explode('directors')
+#data = data.assign(genres=data['genres'].str.split(',')).explode('genres').assign(directors=data['directors'].str.split(',')).explode('directors')
+#print(data)
 
-# Диаграмма 1: по оси Y - рейтинги, по X - жанры
-fig1 = px.scatter(data_genres, x='genres', y='rating', color='cluster', title='Рейтинги по жанрам с кластеризацией', height=700)
+# безрезультатная диаграмма
+fig1 = px.scatter(data, x='genres', y='rating', color='cluster', title='Рейтинги по жанрам с кластеризацией', height=700)
 # Диаграмма 2: по оси Y - жанры, по X - режиссеры
-fig2 = px.scatter(data_genres, x='directors', y='genres', color='cluster', title='Жанры по режиссерам с кластеризацией', height=700)
+fig2 = px.scatter(data, x='directors', y='genres', color='cluster', title='Жанры по режиссерам с кластеризацией', height=700)
 # Диаграмма 3: по оси Y - жанры, по X - года
-fig3 = px.scatter(data_genres, x='year', y='genres', color='cluster', title='Жанры по годам с кластеризацией', height=1200)
+fig3 = px.scatter(data, x='year', y='genres', color='cluster', title='Жанры по годам с кластеризацией', height=1200)
 # Диаграмма 4: по оси Y - рейтинги, по X - режиссеры
-fig4 = px.scatter(data_genres, x='directors', y='rating', color='cluster', title='Рейтинги по режиссерам с кластеризацией', height=700)
+fig4 = px.scatter(data, x='directors', y='rating', color='cluster', title='Рейтинги по режиссерам с кластеризацией', height=700)
 # Диаграмма 5: по оси Y - рейтинги, по X - года
 fig5 = px.scatter(data, x='year', y='rating', color='cluster', title='Рейтинги по годам с кластеризацией', height=700)
 # Диаграмма 6: по оси Y - режиссеры, по X - года
-fig6 = px.scatter(data_genres, x='year', y='directors', color='cluster', title='Режиссеры по годам с кластеризацией', height=700)
+fig6 = px.scatter(data, x='year', y='directors', color='cluster', title='Режиссеры по годам с кластеризацией', height=700)
 fig7 = px.scatter(data, x='cluster', y='title', color='cluster', title='Кластеризация фильмов', height=1000)
 
-fig8 = px.scatter_3d(data_genres, x='year', y='rating', z='genres', color='cluster', title='Кластеризация фильмов', height=1100)
+fig8 = px.scatter_3d(data, x='year', y='rating', z='genres', color='cluster', title='Кластеризация фильмов', height=1100)
 
 app = Dash()
 
