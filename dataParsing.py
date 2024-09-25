@@ -13,11 +13,12 @@ def get_movie_data(url):
 
   title = soup.find("span", class_="hero__primary-text").text.strip()
   year = soup.find("ul", "ipc-inline-list ipc-inline-list--show-dividers sc-ec65ba05-2 joVhBE baseAlt").find("li").find("a").text.strip()
-  genres = ", ".join([g.text for g in soup.find_all("span", class_="ipc-chip__text")])
-  rating = soup.find("span", class_="sc-eb51e184-1 ljxVSS").text.strip()
+  genres_list = [g.find("span").text.strip() for g in soup.find_all("a", class_="ipc-chip ipc-chip--on-baseAlt")]
+  genres = ", ".join(genres_list)
+  rating = soup.find("span", class_="sc-c4ffe080-1 iQZtLP").text.strip()
   directors_list = [d.find("a").text.strip() for d in soup.find("ul", class_="ipc-inline-list ipc-inline-list--show-dividers ipc-inline-list--inline ipc-metadata-list-item__list-content baseAlt").find_all("li")]
   directors = ", ".join(directors_list)
-  description = soup.find("span", class_="sc-2d37a7c7-2 ggeRnl").text.strip()
+  description = soup.find("span", class_="sc-9579cce5-0 JTONN").text.strip()
 
   return {
     "title": title,
