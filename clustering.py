@@ -8,8 +8,8 @@ import plotly.express as px
 conn = sqlite3.connect('movies.db')
 query = '''
 SELECT movies.title, movies.year, movies.rating,
-       SUBSTR(GROUP_CONCAT(DISTINCT genres.name), 1, INSTR(GROUP_CONCAT(DISTINCT genres.name), ',') - 1) AS genre,
-       SUBSTR(GROUP_CONCAT(DISTINCT directors.name), 1, INSTR(GROUP_CONCAT(DISTINCT directors.name), ',') - 1) AS director
+       genres.name AS genre,
+       directors.name AS director
 FROM movies
 LEFT JOIN movie_genres ON movies.id = movie_genres.movie_id
 LEFT JOIN genres ON movie_genres.genre_id = genres.id
