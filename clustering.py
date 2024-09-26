@@ -124,7 +124,7 @@ def update_graph(x_axis, y_axis):
      Input('z-axis-3d', 'value')]
 )
 def update_graph3d(x_axis3d, y_axis3d, z_axis3d):
-    fig = px.scatter_3d(data, x=x_axis3d, y=y_axis3d, z=z_axis3d, color='cluster', title=f'Кластеризация фильмов', height=1100, hover_data=['title', 'year', 'rating', 'genre', 'director', 'cluster'])
+    fig = px.scatter_3d(data, x=x_axis3d, y=y_axis3d, z=z_axis3d, color='cluster', title=f'Кластеризация фильмов', height=1000, hover_data=['title', 'year', 'rating', 'genre', 'director', 'cluster'])
     return fig
 
 app.run_server(debug=True)
